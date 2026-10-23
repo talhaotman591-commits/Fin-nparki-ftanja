@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>فين نباركي؟ — طنجة</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--navy:#12304a;--blue:#1769aa;--pale:#eef6fb;--green:#198754;--ink:#172b3a;--muted:#647789}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f4f7fa;color:var(--ink)}
+header{background:linear-gradient(135deg,#12304a,#1769aa);color:white;padding:20px 18px 24px;border-radius:0 0 24px 24px}
+.brand{font-size:13px;opacity:.85}h1{font-size:26px;margin:8px 0 5px}header p{margin:0;font-size:14px;opacity:.9}
+main{max-width:900px;margin:auto;padding:14px}
+.searchrow{display:flex;gap:8px;margin-bottom:12px}input{min-width:0;flex:1;border:1px solid #d7e1e9;border-radius:12px;padding:12px;font:inherit;background:white}
+button{border:0;border-radius:12px;padding:11px 13px;font:inherit;font-weight:700;cursor:pointer;background:var(--blue);color:white}
+button.secondary{background:#e2edf5;color:var(--navy)}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}.filters button{font-size:13px;padding:8px 12px}
+.filters button.active{background:var(--navy);color:white}
+#map{height:370px;border-radius:18px;border:1px solid #d7e1e9;z-index:1}
+.notice{font-size:12px;line-height:1.7;color:#785b16;background:#fff7df;padding:10px 12px;border-radius:12px;margin:12px 0}
+.sectiontitle{display:flex;justify-content:space-between;align-items:center;margin:18px 2px 10px}.sectiontitle h2{font-size:18px;margin:0}.count{font-size:12px;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.card{background:white;border:1px solid #e1e8ee;border-radius:15px;padding:14px;box-shadow:0 2px 8px #16324a0a}
+.card h3{margin:0 0 6px;font-size:16px}.address{font-size:12px;color:var(--muted);line-height:1.6}.status{display:inline-block;background:#e7f6ed;color:#17683c;border-radius:20px;padding:4px 8px;font-size:11px;margin:9px 0}
+.card .actions{display:flex;gap:7px;margin-top:9px}.card .actions button{flex:1;font-size:13px}.card .actions a{flex:1;text-align:center;text-decoration:none;background:#e2edf5;color:var(--navy);border-radius:10px;padding:10px 5px;font-size:13px;font-weight:700}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:20px 8px}
+.leaflet-popup-content{font-family:system-ui,sans-serif;line-height:1.7}
+@media(max-width:520px){#map{height:330px}h1{font-size:23px}.searchrow button{padding:10px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">🚗 نموذج تجريبي • طنجة</div>
+  <h1>فين نباركي؟</h1>
+  <p>قلّب على موقف سيارات قريب منك، وشوف الطريق ليه.</p>
+</header>
+<main>
+  <div class="searchrow">
+    <input id="search" type="search" placeholder="قلّب بالاسم أو الحي..." aria-label="البحث">
+    <button id="locate">📍 موقعي</button>
+  </div>
+  <div class="filters">
+    <button class="active" data-filter="all">كاع المواقف</button>
+    <button data-filter="garage">مرائب منظمة</button>
+    <button data-filter="coast">جهة الكورنيش</button>
+  </div>
+  <div id="map" aria-label="خريطة مواقف السيارات في طنجة"></div>
+  <div class="notice">⚠️ هادشي نموذج أولي: المواقع تقريبية للتجربة، وما كيعرضش عدد البلايص الشاغرة الحقيقي ولا الأثمنة المؤكدة. تأكد من المعلومات عند الوصول.</div>
+  <div class="sectiontitle"><h2>مواقف للتجربة</h2><span class="count" id="count"></span></div>
+  <div class="cards" id="cards"></div>
+</main>
+<footer>الخريطة © OpenStreetMap contributors • نموذج تجريبي غير رسمي</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const parks = [
+ {id:1,name:"Parking Cervantes",address:"قرب مسرح سيرفانتيس ومدخل المدينة القديمة",lat:35.7848,lng:-5.8125,type:"garage",tag:"مرأب منظم"},
+ {id:2,name:"Parking Jardin Iberia",address:"زنقة الفينيقيين، منطقة إيبيريا",lat:35.7729,lng:-5.8188,type:"garage",tag:"مرأب منظم"},
+ {id:3,name:"Parking Sidi Bouabid",address:"زنقة سيدي بوعبيد، وسط طنجة",lat:35.7852,lng:-5.8110,type:"garage",tag:"مرأب منظم"},
+ {id:4,name:"Parking Corniche",address:"شارع محمد السادس، جهة الكورنيش",lat:35.7772,lng:-5.8007,type:"coast",tag:"جهة الكورنيش"},
+ {id:5,name:"Parking Quartier Administratif",address:"شارع عمر بن الخطاب، الحي الإداري",lat:35.7738,lng:-5.8130,type:"garage",tag:"مرأب منظم"},
+ {id:6,name:"Parking Bab El Marsa",address:"زنقة البرتغال، قرب الميناء والمدينة القديمة",lat:35.7858,lng:-5.8077,type:"coast",tag:"قرب الميناء"}
+];
+const map = L.map('map').setView([35.7796,-5.813],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+ maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+const layer=L.layerGroup().addTo(map);let filter='all';let userMarker=null;
+function directions(p){return `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`}
+function draw(){
+ layer.clearLayers();
+ const q=document.getElementById('search').value.trim().toLowerCase();
+ const shown=parks.filter(p=>(filter==='all'||p.type===filter)&&(`${p.name} ${p.address} ${p.tag}`.toLowerCase().includes(q)));
+ shown.forEach(p=>{
+  const marker=L.marker([p.lat,p.lng]).addTo(layer);
+  marker.bindPopup(`<strong>${p.name}</strong><br>${p.address}<br><small>موقع تقريبي للتجربة — ما كايناش معلومات مباشرة على الشغور.</small><br><a href="${directions(p)}" target="_blank" rel="noopener">فتح الاتجاهات</a>`);
+ });
+ document.getElementById('count').textContent=`${shown.length} مواقف`;
+ document.getElementById('cards').innerHTML=shown.map(p=>`<article class="card"><h3>🅿️ ${p.name}</h3><div class="address">${p.address}</div><span class="status">${p.tag}</span><div class="address">الشغور: غير متوفر مباشرة</div><div class="actions"><button onclick="focusPark(${p.id})">شوف فالخريطة</button><a href="${directions(p)}" target="_blank" rel="noopener">الطريق لهنا</a></div></article>`).join('')||'<p>ما لقينا حتى موقف بهاد البحث.</p>';
+}
+window.focusPark=id=>{const p=parks.find(x=>x.id===id);map.setView([p.lat,p.lng],16);layer.eachLayer(m=>{if(m.getLatLng().lat===p.lat&&m.getLatLng().lng===p.lng)m.openPopup()})};
+document.getElementById('search').addEventListener('input',draw);
+document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));draw()}));
+document.getElementById('locate').addEventListener('click',()=>{
+ if(!navigator.geolocation){alert('المتصفح ما كيدعمش تحديد الموقع.');return}
+ navigator.geolocation.getCurrentPosition(pos=>{
+  const lat=pos.coords.latitude,lng=pos.coords.longitude;
+  if(userMarker)map.removeLayer(userMarker);
+  userMarker=L.marker([lat,lng]).addTo(map).bindPopup('هادا هو موقعك التقريبي').openPopup();
+  map.setView([lat,lng],14);
+ },()=>alert('ما قدرناش نجيبو الموقع. فعّل GPS وسمح للمتصفح يستعمل الموقع، أو جرّب من اتصال آمن HTTPS.'),{enableHighAccuracy:true,timeout:10000});
+});
+draw();
+</script>
+</body>
+</html>
